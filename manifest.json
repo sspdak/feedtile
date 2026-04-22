@@ -1,0 +1,16 @@
+{
+  "name": "FeedTile",
+  "short_name": "FeedTile",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "description": "A custom tile-based RSS Reader.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
