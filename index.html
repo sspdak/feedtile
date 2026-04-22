@@ -60,11 +60,13 @@
   </header>
 
   <main class="flex-1 p-4 md:p-6 lg:p-8 h-full overflow-y-auto w-full max-w-7xl mx-auto">
-    <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-1 px-1 scrollbar-hide" id="categoryBadges">
+    <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-2 px-1 scrollbar-hide" id="categoryBadges">
       </div>
 
-    <div class="mb-6 flex gap-2 overflow-x-auto pb-3 px-1 scrollbar-hide" id="sourceBadges">
-      </div>
+    <div class="mb-6 px-1 flex items-center justify-between">
+      <select id="sourceFilterDropdown" onchange="filterSource(this.value)" class="w-full sm:w-64 p-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 dark:text-slate-300 cursor-pointer appearance-none">
+        </select>
+    </div>
 
     <div id="feedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
       </div>
@@ -105,7 +107,7 @@
     let readArticles = JSON.parse(localStorage.getItem('feedtile_read')) || [];
     let globalStories = []; 
     let currentFilter = 'All'; 
-    let currentSourceFilter = 'All'; // New state for source-level filtering
+    let currentSourceFilter = 'All'; 
 
     const colorPalette = [
       'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/50',
@@ -241,7 +243,7 @@
 
     function filterCategory(category) {
       currentFilter = category;
-      currentSourceFilter = 'All'; // Reset source filter when category changes
+      currentSourceFilter = 'All'; // Reset dropdown when main category changes
       renderCategories(); 
       renderSources();
       renderTiles();      
@@ -249,7 +251,6 @@
 
     function filterSource(sourceName) {
       currentSourceFilter = sourceName;
-      renderSources();
       renderTiles();
     }
 
@@ -257,7 +258,6 @@
       const container = document.getElementById('feedContainer');
       container.innerHTML = '';
 
-      // Apply both category and source filters
       let filteredStories = globalStories;
       if (currentFilter !== 'All') {
         filteredStories = filteredStories.filter(story => story.category === currentFilter);
@@ -338,38 +338,34 @@
     }
 
     function renderSources() {
-      const container = document.getElementById('sourceBadges');
+      const dropdown = document.getElementById('sourceFilterDropdown');
       
-      // Get unique source names, filtered by the current active category
       let relevantStories = globalStories;
       if (currentFilter !== 'All') {
         relevantStories = globalStories.filter(s => s.category === currentFilter);
       }
-      const uniqueSources = [...new Set(relevantStories.map(s => s.siteName))];
+      
+      // Sort sources alphabetically for easier scanning
+      const uniqueSources = [...new Set(relevantStories.map(s => s.siteName))].sort();
 
       if(uniqueSources.length === 0) {
-          container.innerHTML = '';
+          dropdown.innerHTML = `<option value="All">No sources available</option>`;
+          dropdown.disabled = true;
+          dropdown.parentElement.classList.add('hidden'); // Hide the row if empty
           return;
       }
 
-      // Small Pill Styling for Sub-Filters
-      const allActiveStyle = currentSourceFilter === 'All' 
-        ? 'bg-slate-600 text-white border-transparent dark:bg-slate-500 shadow-sm' 
-        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700';
-        
-      let html = `<button onclick="filterSource('All')" class="whitespace-nowrap px-3 py-1 border text-[10px] uppercase tracking-wider font-bold rounded-md transition-all active:scale-95 ${allActiveStyle}">All Sources</button>`;
+      dropdown.disabled = false;
+      dropdown.parentElement.classList.remove('hidden');
 
+      let html = `<option value="All">All Sources (${uniqueSources.length})</option>`;
+      
       uniqueSources.forEach(source => {
-        const isActive = currentSourceFilter === source;
-        
-        const activeStyle = isActive 
-          ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700 shadow-sm' 
-          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700';
-
-        html += `<button onclick="filterSource('${source}')" class="whitespace-nowrap px-3 py-1 border text-[10px] uppercase tracking-wider font-bold rounded-md transition-all active:scale-95 ${activeStyle}">${source}</button>`;
+        const isSelected = currentSourceFilter === source ? 'selected' : '';
+        html += `<option value="${source}" ${isSelected}>${source}</option>`;
       });
 
-      container.innerHTML = html;
+      dropdown.innerHTML = html;
     }
 
     function addFeed() {
