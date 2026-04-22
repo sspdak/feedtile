@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en" class="dark"> <head>
+<html lang="en" class="dark">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FeedTile</title>
@@ -7,10 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Configure Tailwind to use classes for Dark Mode
     tailwind.config = { darkMode: 'class' }
-    
-    // Instantly check theme on load to prevent flashing
     if (localStorage.getItem('feedtile_theme') === 'light' || (!('feedtile_theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.remove('dark');
     } else {
@@ -20,15 +18,10 @@
   <style>
     .tile { transition: transform 0.2s ease, box-shadow 0.2s ease; }
     .tile:active { transform: scale(0.98); }
-    
-    /* Dynamic Read States */
     .read { opacity: 0.6; filter: grayscale(30%); border-color: #e2e8f0; background-color: #f8fafc; box-shadow: none; }
     .read h3 { color: #64748b; }
-    
-    /* Dark Mode Read States */
     .dark .read { opacity: 0.5; filter: grayscale(40%); border-color: #1e293b; background-color: #0f172a80; }
     .dark .read h3 { color: #94a3b8; }
-
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -67,7 +60,10 @@
   </header>
 
   <main class="flex-1 p-4 md:p-6 lg:p-8 h-full overflow-y-auto w-full max-w-7xl mx-auto">
-    <div class="mb-6 flex gap-3 overflow-x-auto py-3 px-1 scrollbar-hide" id="categoryBadges">
+    <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-1 px-1 scrollbar-hide" id="categoryBadges">
+      </div>
+
+    <div class="mb-6 flex gap-2 overflow-x-auto pb-3 px-1 scrollbar-hide" id="sourceBadges">
       </div>
 
     <div id="feedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -76,16 +72,13 @@
 
   <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-end sm:items-center">
     <div class="bg-white dark:bg-slate-800 w-full sm:w-[450px] sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col shadow-2xl transition-colors duration-300">
-      
       <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
         <h2 class="text-xl font-bold text-slate-800 dark:text-white">Settings</h2>
         <button onclick="closeSettings()" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-700 rounded-full">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
-
       <div class="p-6 overflow-y-auto flex-1">
-        
         <div class="mb-8 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
             <h3 class="font-bold text-slate-800 dark:text-white">Appearance</h3>
@@ -96,15 +89,11 @@
             <span id="themeText" class="text-sm font-bold text-slate-700 dark:text-slate-200">Dark</span>
           </button>
         </div>
-
         <div>
           <h3 class="font-bold text-slate-800 dark:text-white mb-1">Your Sources</h3>
           <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Manage the websites you track</p>
-          
-          <ul id="settingsFeedList" class="space-y-3">
-            </ul>
+          <ul id="settingsFeedList" class="space-y-3"></ul>
         </div>
-
       </div>
     </div>
   </div>
@@ -116,8 +105,8 @@
     let readArticles = JSON.parse(localStorage.getItem('feedtile_read')) || [];
     let globalStories = []; 
     let currentFilter = 'All'; 
+    let currentSourceFilter = 'All'; // New state for source-level filtering
 
-    // Unified Light/Dark Palette
     const colorPalette = [
       'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/50',
       'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800/50',
@@ -128,8 +117,6 @@
       'bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-900/40 dark:text-teal-400 dark:border-teal-800/50',
       'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800/50'
     ];
-
-    /* --- THEME & SETTINGS LOGIC --- */
 
     function toggleTheme() {
       const html = document.documentElement;
@@ -149,7 +136,6 @@
       document.getElementById('themeText').innerText = theme === 'dark' ? 'Dark' : 'Light';
     }
 
-    // Initialize UI text on load
     if (document.documentElement.classList.contains('dark')) updateThemeUI('dark');
     else updateThemeUI('light');
 
@@ -186,18 +172,17 @@
       if(confirm("Stop tracking this source?")) {
         feeds.splice(index, 1);
         localStorage.setItem('feedtile_feeds', JSON.stringify(feeds));
-        renderSettingsFeeds(); // Update list immediately
+        renderSettingsFeeds();
         
-        // If no categories match the current filter anymore, reset to All
         const remainingCategories = [...new Set(feeds.map(f => f.category))];
-        if (!remainingCategories.includes(currentFilter)) currentFilter = 'All';
+        if (!remainingCategories.includes(currentFilter)) {
+            currentFilter = 'All';
+            currentSourceFilter = 'All';
+        }
         
-        loadFeeds(); // Re-fetch to clear deleted stories from the grid
+        loadFeeds();
       }
     }
-
-
-    /* --- CORE APP LOGIC --- */
 
     function toggleMenu() {
       const menu = document.getElementById('addFeedSection');
@@ -250,22 +235,36 @@
 
       globalStories.sort((a, b) => b.date - a.date);
       renderCategories();
+      renderSources();
       renderTiles();
     }
 
     function filterCategory(category) {
       currentFilter = category;
+      currentSourceFilter = 'All'; // Reset source filter when category changes
       renderCategories(); 
+      renderSources();
       renderTiles();      
+    }
+
+    function filterSource(sourceName) {
+      currentSourceFilter = sourceName;
+      renderSources();
+      renderTiles();
     }
 
     function renderTiles() {
       const container = document.getElementById('feedContainer');
       container.innerHTML = '';
 
-      const filteredStories = currentFilter === 'All' 
-        ? globalStories 
-        : globalStories.filter(story => story.category === currentFilter);
+      // Apply both category and source filters
+      let filteredStories = globalStories;
+      if (currentFilter !== 'All') {
+        filteredStories = filteredStories.filter(story => story.category === currentFilter);
+      }
+      if (currentSourceFilter !== 'All') {
+        filteredStories = filteredStories.filter(story => story.siteName === currentSourceFilter);
+      }
 
       if (filteredStories.length === 0) {
         container.innerHTML = `
@@ -318,7 +317,6 @@
           return;
       }
 
-      // "All" Button
       const allActiveStyle = currentFilter === 'All' 
         ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-transparent dark:text-white ring-2 ring-slate-400 dark:ring-blue-500/50 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 shadow-md' 
         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700';
@@ -334,6 +332,41 @@
           : 'opacity-70 hover:opacity-100 hover:scale-105';
 
         html += `<button onclick="filterCategory('${c}')" class="whitespace-nowrap px-4 py-1.5 border text-xs font-bold rounded-full transition-all active:scale-95 ${baseColor} ${activeStyle}">${c}</button>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderSources() {
+      const container = document.getElementById('sourceBadges');
+      
+      // Get unique source names, filtered by the current active category
+      let relevantStories = globalStories;
+      if (currentFilter !== 'All') {
+        relevantStories = globalStories.filter(s => s.category === currentFilter);
+      }
+      const uniqueSources = [...new Set(relevantStories.map(s => s.siteName))];
+
+      if(uniqueSources.length === 0) {
+          container.innerHTML = '';
+          return;
+      }
+
+      // Small Pill Styling for Sub-Filters
+      const allActiveStyle = currentSourceFilter === 'All' 
+        ? 'bg-slate-600 text-white border-transparent dark:bg-slate-500 shadow-sm' 
+        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700';
+        
+      let html = `<button onclick="filterSource('All')" class="whitespace-nowrap px-3 py-1 border text-[10px] uppercase tracking-wider font-bold rounded-md transition-all active:scale-95 ${allActiveStyle}">All Sources</button>`;
+
+      uniqueSources.forEach(source => {
+        const isActive = currentSourceFilter === source;
+        
+        const activeStyle = isActive 
+          ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700 shadow-sm' 
+          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700';
+
+        html += `<button onclick="filterSource('${source}')" class="whitespace-nowrap px-3 py-1 border text-[10px] uppercase tracking-wider font-bold rounded-md transition-all active:scale-95 ${activeStyle}">${source}</button>`;
       });
 
       container.innerHTML = html;
@@ -364,7 +397,6 @@
         if (readArticles.length > 500) readArticles.shift(); 
         localStorage.setItem('feedtile_read', JSON.stringify(readArticles));
         
-        // Strip active classes and add generic 'read' class which handles both light/dark via CSS
         element.className = 'tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full read';
       }
     }
