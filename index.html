@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FeedTile</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
@@ -10,53 +10,62 @@
   <style>
     /* Smooth transitions for the tile hover effects */
     .tile { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-    .tile:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    .tile:active { transform: scale(0.98); } /* Better mobile tap feedback */
     /* Visual indicator for read articles */
-    .read { opacity: 0.55; filter: grayscale(50%); }
+    .read { opacity: 0.55; filter: grayscale(50%); border-color: #e2e8f0; }
+    .read h3 { color: #64748b; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-  <aside class="w-64 bg-white border-r border-slate-200 p-6 hidden md:block">
-    <h1 class="text-2xl font-bold flex items-center gap-2 mb-8 text-blue-600">
-      <img src="icon.svg" class="w-8 h-8 rounded" alt="Logo"> FeedTile
-    </h1>
-    
-    <div class="mb-8">
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Add New Site</h2>
-      <input type="url" id="feedUrl" placeholder="https://site.com/rss" class="w-full mb-2 p-2 border rounded bg-slate-50 text-sm">
-      <input type="text" id="feedCategory" placeholder="Category (e.g. Tech)" class="w-full mb-3 p-2 border rounded bg-slate-50 text-sm">
-      <button onclick="addFeed()" class="w-full bg-blue-600 text-white p-2 rounded text-sm font-semibold hover:bg-blue-700 transition">Add Feed</button>
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+    <div class="p-4 flex justify-between items-center">
+      <h1 class="text-2xl font-bold flex items-center gap-2 text-blue-600">
+        <img src="icon.svg" class="w-8 h-8 rounded shadow-sm" alt="Logo"> FeedTile
+      </h1>
+      <button onclick="toggleMenu()" class="p-2 text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+      </button>
     </div>
 
-    <div>
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Categories</h2>
-      <ul id="categoryList" class="space-y-2 text-sm font-medium">
-        </ul>
+    <div id="addFeedSection" class="hidden px-4 pb-4 bg-slate-50 border-t border-slate-200 pt-4">
+      <h2 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Add a New Source</h2>
+      <div class="flex flex-col md:flex-row gap-3">
+        <input type="url" id="feedUrl" placeholder="Feed URL (e.g., https://site.com/rss)" class="flex-1 p-3 border border-slate-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <input type="text" id="feedCategory" placeholder="Category (e.g., Local News)" class="w-full md:w-48 p-3 border border-slate-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <button onclick="addFeed()" class="bg-blue-600 text-white p-3 rounded-lg text-sm font-bold hover:bg-blue-700 transition shadow-sm">Save Feed</button>
+      </div>
     </div>
-  </aside>
+  </header>
 
-  <main class="flex-1 p-6 lg:p-10 h-screen overflow-y-auto">
-    <header class="flex justify-between items-center mb-8 md:hidden">
-      <h1 class="text-2xl font-bold text-blue-600">FeedTile</h1>
-    </header>
-    
-    <div id="feedContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  <main class="flex-1 p-4 md:p-6 lg:p-8 h-full overflow-y-auto w-full max-w-7xl mx-auto">
+    <div class="mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="categoryBadges">
+      </div>
+
+    <div id="feedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
       </div>
   </main>
 
   <script>
-    // Configuration
-    const PROXY_URL = 'https://feedtile.ewing-jacob.workers.dev/';
+    // Configuration - Using your live worker!
+    const PROXY_URL = 'https://feedtile.ewing-jacob.workers.dev/?url=';
     
-    // State
+    // State Management
     let feeds = JSON.parse(localStorage.getItem('feedtile_feeds')) || [];
     let readArticles = JSON.parse(localStorage.getItem('feedtile_read')) || [];
 
-    // Initialize
+    // UI Toggles
+    function toggleMenu() {
+      const menu = document.getElementById('addFeedSection');
+      menu.classList.toggle('hidden');
+    }
+
+    // Core Logic
     async function loadFeeds() {
       const container = document.getElementById('feedContainer');
-      container.innerHTML = '<p class="col-span-full text-slate-500">Fetching your tiles...</p>';
+      container.innerHTML = `<div class="col-span-full py-12 flex justify-center"><div class="animate-pulse flex space-x-4"><div class="flex-1 space-y-4 py-1"><div class="h-4 bg-slate-300 rounded w-3/4"></div><div class="space-y-2"><div class="h-4 bg-slate-300 rounded"></div><div class="h-4 bg-slate-300 rounded w-5/6"></div></div></div></div></div>`;
       
       let allStories = [];
 
@@ -66,12 +75,10 @@
           const text = await res.text();
           const xml = new window.DOMParser().parseFromString(text, "text/xml");
           
-          // Handle both RSS <item> and Atom <entry>
-          const items = Array.from(xml.querySelectorAll("item, entry")).slice(0, 10);
+          const items = Array.from(xml.querySelectorAll("item, entry")).slice(0, 12); // Pull top 12 per feed
           
           items.forEach(item => {
             const title = item.querySelector("title")?.textContent || "No Title";
-            // Atom uses <link href="...">, RSS uses <link>URL</link>
             const linkNode = item.querySelector("link");
             const link = linkNode?.getAttribute("href") || linkNode?.textContent || "#";
             const pubDate = item.querySelector("pubDate, published, updated")?.textContent;
@@ -83,7 +90,6 @@
         }
       }
 
-      // Sort by newest first
       allStories.sort((a, b) => b.date - a.date);
       renderTiles(allStories);
       renderCategories();
@@ -94,66 +100,86 @@
       container.innerHTML = '';
 
       if (stories.length === 0) {
-        container.innerHTML = `<div class="col-span-full p-10 text-center bg-white rounded-xl border border-dashed border-slate-300">
-          <p class="text-slate-500">No feeds added yet. Add an RSS URL in the sidebar!</p>
-        </div>`;
+        container.innerHTML = `
+          <div class="col-span-full mt-10 p-8 text-center bg-white rounded-2xl border-2 border-dashed border-slate-300">
+            <h3 class="text-lg font-bold text-slate-700 mb-2">Your Feed is Empty</h3>
+            <p class="text-slate-500 text-sm">Tap the + icon at the top right to add your first RSS feed!</p>
+          </div>`;
         return;
       }
 
       stories.forEach(story => {
-        const isRead = readArticles.includes(story.link) ? 'read' : '';
-        const dateStr = isNaN(story.date) ? '' : story.date.toLocaleDateString();
+        const isRead = readArticles.includes(story.link) ? 'read bg-slate-50' : 'bg-white shadow-sm';
+        const dateStr = isNaN(story.date) ? '' : story.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
         const tile = document.createElement('a');
         tile.href = story.link;
         tile.target = "_blank";
-        tile.className = `tile block p-5 bg-white border border-slate-200 rounded-xl cursor-pointer flex flex-col h-full ${isRead}`;
+        tile.className = `tile block p-5 border border-slate-200 rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
         tile.onclick = (e) => markAsRead(story.link, tile);
 
         tile.innerHTML = `
-          <div class="text-xs font-bold text-blue-600 mb-2 uppercase tracking-wide">${story.category}</div>
-          <h3 class="text-lg font-bold text-slate-800 leading-snug flex-1">${story.title}</h3>
-          <div class="mt-4 text-xs text-slate-400 font-medium">${dateStr}</div>
+          <div class="flex justify-between items-start mb-3">
+            <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider">${story.category}</span>
+            <span class="text-xs text-slate-400 font-medium">${dateStr}</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-900 leading-snug flex-1">${story.title}</h3>
         `;
         container.appendChild(tile);
       });
     }
 
     function renderCategories() {
-      const list = document.getElementById('categoryList');
+      const container = document.getElementById('categoryBadges');
       const categories = [...new Set(feeds.map(f => f.category))];
-      list.innerHTML = categories.map(c => `<li class="text-slate-600 cursor-pointer hover:text-blue-600 transition">${c}</li>`).join('');
+      
+      if(categories.length === 0) {
+          container.innerHTML = '';
+          return;
+      }
+
+      container.innerHTML = `<span class="whitespace-nowrap px-3 py-1 bg-slate-800 text-white text-xs font-bold rounded-full">All Categories</span>` + 
+        categories.map(c => `<span class="whitespace-nowrap px-3 py-1 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-full">${c}</span>`).join('');
     }
 
     function addFeed() {
-      const url = document.getElementById('feedUrl').value;
-      const category = document.getElementById('feedCategory').value || 'General';
+      const url = document.getElementById('feedUrl').value.trim();
+      const category = document.getElementById('feedCategory').value.trim() || 'General';
       if (!url) return;
+
+      // Prevent exact duplicates
+      if (feeds.some(f => f.url === url)) {
+          alert("You are already following this feed!");
+          return;
+      }
 
       feeds.push({ url, category });
       localStorage.setItem('feedtile_feeds', JSON.stringify(feeds));
       
       document.getElementById('feedUrl').value = '';
       document.getElementById('feedCategory').value = '';
+      toggleMenu(); // Hide menu on mobile after adding
       loadFeeds();
     }
 
     function markAsRead(link, element) {
       if (!readArticles.includes(link)) {
         readArticles.push(link);
-        // Keep array size manageable
-        if (readArticles.length > 500) readArticles.shift(); 
+        if (readArticles.length > 500) readArticles.shift(); // Keep local storage lean
         localStorage.setItem('feedtile_read', JSON.stringify(readArticles));
-        element.classList.add('read');
+        
+        // Apply read styles immediately without reloading
+        element.classList.add('read', 'bg-slate-50');
+        element.classList.remove('bg-white', 'shadow-sm');
       }
     }
 
-    // Register Service Worker for PWA installation
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
     }
 
-    // Boot
+    // Initial Load
     loadFeeds();
   </script>
 </body>
