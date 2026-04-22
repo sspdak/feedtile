@@ -1,43 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en" class="dark"> <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FeedTile</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Configure Tailwind to use classes for Dark Mode
+    tailwind.config = { darkMode: 'class' }
+    
+    // Instantly check theme on load to prevent flashing
+    if (localStorage.getItem('feedtile_theme') === 'light' || (!('feedtile_theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
   <style>
-    body { background-color: #0f172a; } /* slate-900 fallback */
     .tile { transition: transform 0.2s ease, box-shadow 0.2s ease; }
     .tile:active { transform: scale(0.98); }
-    /* Dark mode read state styling */
-    .read { opacity: 0.5; filter: grayscale(40%); border-color: #1e293b; }
-    .read h3 { color: #94a3b8; } /* slate-400 */
+    
+    /* Dynamic Read States */
+    .read { opacity: 0.6; filter: grayscale(30%); border-color: #e2e8f0; background-color: #f8fafc; box-shadow: none; }
+    .read h3 { color: #64748b; }
+    
+    /* Dark Mode Read States */
+    .dark .read { opacity: 0.5; filter: grayscale(40%); border-color: #1e293b; background-color: #0f172a80; }
+    .dark .read h3 { color: #94a3b8; }
+
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-300">
 
-  <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-20 shadow-md">
+  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm dark:shadow-md transition-colors duration-300">
     <div class="p-4 flex justify-between items-center">
-      <h1 class="text-2xl font-bold flex items-center gap-2 text-blue-400 cursor-pointer" onclick="filterCategory('All')">
+      <h1 class="text-2xl font-bold flex items-center gap-2 text-blue-600 dark:text-blue-400 cursor-pointer" onclick="filterCategory('All')">
         <img src="icon.svg" class="w-8 h-8 rounded shadow-sm" alt="Logo"> FeedTile
       </h1>
-      <button onclick="toggleMenu()" class="p-2 text-slate-300 bg-slate-700 rounded-lg hover:bg-slate-600 transition">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-        </svg>
-      </button>
+      
+      <div class="flex gap-2">
+        <button onclick="openSettings()" class="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+        <button onclick="toggleMenu()" class="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+        </button>
+      </div>
     </div>
 
-    <div id="addFeedSection" class="hidden px-4 pb-4 bg-slate-800 border-t border-slate-700 pt-4">
-      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Add a New Source</h2>
+    <div id="addFeedSection" class="hidden px-4 pb-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pt-4 transition-colors">
+      <h2 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Add a New Source</h2>
       <div class="flex flex-col md:flex-row gap-3">
-        <input type="url" id="feedUrl" placeholder="Website URL (e.g., theverge.com)" class="flex-1 p-3 border border-slate-600 rounded-lg bg-slate-700 text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        <input type="text" id="feedCategory" placeholder="Category (e.g., Tech)" class="w-full md:w-48 p-3 border border-slate-600 rounded-lg bg-slate-700 text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        <button onclick="addFeed()" class="bg-blue-600 text-white p-3 rounded-lg text-sm font-bold hover:bg-blue-500 transition shadow-sm">Save Feed</button>
+        <input type="url" id="feedUrl" placeholder="Website URL (e.g., theverge.com)" class="flex-1 p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <input type="text" id="feedCategory" placeholder="Category (e.g., Tech)" class="w-full md:w-48 p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <button onclick="addFeed()" class="bg-blue-600 text-white p-3 rounded-lg text-sm font-bold hover:bg-blue-700 dark:hover:bg-blue-500 transition shadow-sm">Save Feed</button>
       </div>
     </div>
   </header>
@@ -50,6 +74,41 @@
       </div>
   </main>
 
+  <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-end sm:items-center">
+    <div class="bg-white dark:bg-slate-800 w-full sm:w-[450px] sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col shadow-2xl transition-colors duration-300">
+      
+      <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+        <h2 class="text-xl font-bold text-slate-800 dark:text-white">Settings</h2>
+        <button onclick="closeSettings()" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-700 rounded-full">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1">
+        
+        <div class="mb-8 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 class="font-bold text-slate-800 dark:text-white">Appearance</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Toggle light and dark mode</p>
+          </div>
+          <button onclick="toggleTheme()" class="bg-slate-200 dark:bg-slate-700 p-2 rounded-lg flex gap-2 items-center transition-colors">
+            <span id="themeIcon" class="text-xl">🌙</span>
+            <span id="themeText" class="text-sm font-bold text-slate-700 dark:text-slate-200">Dark</span>
+          </button>
+        </div>
+
+        <div>
+          <h3 class="font-bold text-slate-800 dark:text-white mb-1">Your Sources</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Manage the websites you track</p>
+          
+          <ul id="settingsFeedList" class="space-y-3">
+            </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <script>
     const PROXY_URL = 'https://feedtile.ewing-jacob.workers.dev/?url=';
     
@@ -58,17 +117,87 @@
     let globalStories = []; 
     let currentFilter = 'All'; 
 
-    // Dark Mode Color Palette
+    // Unified Light/Dark Palette
     const colorPalette = [
-      'bg-blue-900/40 text-blue-400 border-blue-800/50',
-      'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
-      'bg-purple-900/40 text-purple-400 border-purple-800/50',
-      'bg-amber-900/40 text-amber-400 border-amber-800/50',
-      'bg-rose-900/40 text-rose-400 border-rose-800/50',
-      'bg-indigo-900/40 text-indigo-400 border-indigo-800/50',
-      'bg-teal-900/40 text-teal-400 border-teal-800/50',
-      'bg-orange-900/40 text-orange-400 border-orange-800/50'
+      'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800/50',
+      'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800/50',
+      'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800/50',
+      'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-800/50',
+      'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-900/40 dark:text-rose-400 dark:border-rose-800/50',
+      'bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-400 dark:border-indigo-800/50',
+      'bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-900/40 dark:text-teal-400 dark:border-teal-800/50',
+      'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800/50'
     ];
+
+    /* --- THEME & SETTINGS LOGIC --- */
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('feedtile_theme', 'light');
+        updateThemeUI('light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('feedtile_theme', 'dark');
+        updateThemeUI('dark');
+      }
+    }
+
+    function updateThemeUI(theme) {
+      document.getElementById('themeIcon').innerText = theme === 'dark' ? '🌙' : '☀️';
+      document.getElementById('themeText').innerText = theme === 'dark' ? 'Dark' : 'Light';
+    }
+
+    // Initialize UI text on load
+    if (document.documentElement.classList.contains('dark')) updateThemeUI('dark');
+    else updateThemeUI('light');
+
+    function openSettings() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+      renderSettingsFeeds();
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function renderSettingsFeeds() {
+      const list = document.getElementById('settingsFeedList');
+      if (feeds.length === 0) {
+        list.innerHTML = `<li class="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">No sources added yet.</li>`;
+        return;
+      }
+
+      list.innerHTML = feeds.map((f, index) => `
+        <li class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+          <div class="overflow-hidden">
+            <div class="text-[10px] font-bold text-blue-500 uppercase">${f.category}</div>
+            <div class="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">${f.url.replace(/^https?:\/\//, '')}</div>
+          </div>
+          <button onclick="removeFeed(${index})" class="ml-4 p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 rounded-lg transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </li>
+      `).join('');
+    }
+
+    function removeFeed(index) {
+      if(confirm("Stop tracking this source?")) {
+        feeds.splice(index, 1);
+        localStorage.setItem('feedtile_feeds', JSON.stringify(feeds));
+        renderSettingsFeeds(); // Update list immediately
+        
+        // If no categories match the current filter anymore, reset to All
+        const remainingCategories = [...new Set(feeds.map(f => f.category))];
+        if (!remainingCategories.includes(currentFilter)) currentFilter = 'All';
+        
+        loadFeeds(); // Re-fetch to clear deleted stories from the grid
+      }
+    }
+
+
+    /* --- CORE APP LOGIC --- */
 
     function toggleMenu() {
       const menu = document.getElementById('addFeedSection');
@@ -86,8 +215,7 @@
 
     async function loadFeeds() {
       const container = document.getElementById('feedContainer');
-      // Dark mode skeleton loader
-      container.innerHTML = `<div class="col-span-full py-12 flex justify-center"><div class="animate-pulse flex space-x-4"><div class="flex-1 space-y-4 py-1"><div class="h-4 bg-slate-700 rounded w-3/4"></div><div class="space-y-2"><div class="h-4 bg-slate-700 rounded"></div><div class="h-4 bg-slate-700 rounded w-5/6"></div></div></div></div></div>`;
+      container.innerHTML = `<div class="col-span-full py-12 flex justify-center"><div class="animate-pulse flex space-x-4"><div class="flex-1 space-y-4 py-1"><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded w-3/4"></div><div class="space-y-2"><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded"></div><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded w-5/6"></div></div></div></div></div>`;
       
       globalStories = []; 
 
@@ -112,12 +240,7 @@
             const pubDate = item.querySelector("pubDate, published, updated")?.textContent;
             
             globalStories.push({ 
-              title, 
-              link, 
-              date: new Date(pubDate), 
-              category: feed.category, 
-              siteName: siteName,
-              domain: domain
+              title, link, date: new Date(pubDate), category: feed.category, siteName, domain
             });
           });
         } catch (e) {
@@ -146,9 +269,9 @@
 
       if (filteredStories.length === 0) {
         container.innerHTML = `
-          <div class="col-span-full mt-10 p-8 text-center bg-slate-800 rounded-2xl border-2 border-dashed border-slate-700">
-            <h3 class="text-lg font-bold text-slate-300 mb-2">No Stories Here</h3>
-            <p class="text-slate-500 text-sm">Add some feeds to this category, or check back later!</p>
+          <div class="col-span-full mt-10 p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700">
+            <h3 class="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No Stories Here</h3>
+            <p class="text-slate-500 text-sm">Add some feeds or adjust your filters!</p>
           </div>`;
         return;
       }
@@ -156,30 +279,29 @@
       const colorMap = getColorMap();
 
       filteredStories.forEach(story => {
-        // Dark mode read vs unread classes
-        const isRead = readArticles.includes(story.link) ? 'read bg-slate-900/50' : 'bg-slate-800 shadow-lg';
+        const isRead = readArticles.includes(story.link) ? 'read' : 'bg-white shadow-sm dark:bg-slate-800 dark:shadow-lg border-slate-200 dark:border-slate-700';
         const dateStr = isNaN(story.date) ? '' : story.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const logoUrl = `https://s2.googleusercontent.com/s2/favicons?domain=${story.domain}&sz=64`;
         
-        const badgeColor = colorMap[story.category] || 'bg-slate-700 text-slate-300 border-slate-600';
+        const badgeColor = colorMap[story.category] || 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
 
         const tile = document.createElement('a');
         tile.href = story.link;
         tile.target = "_blank";
-        tile.className = `tile block p-5 border border-slate-700 hover:border-slate-600 rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
+        tile.className = `tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
         tile.onclick = (e) => markAsRead(story.link, tile);
 
         tile.innerHTML = `
           <div class="flex justify-between items-start mb-3">
             <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border ${badgeColor}">${story.category}</span>
-            <span class="text-xs text-slate-500 font-medium">${dateStr}</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">${dateStr}</span>
           </div>
           
-          <h3 class="text-base font-bold text-slate-100 leading-snug flex-1 mb-4">${story.title}</h3>
+          <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug flex-1 mb-4">${story.title}</h3>
           
-          <div class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-700/50">
+          <div class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-slate-700/50">
             <img src="${logoUrl}" alt="${story.siteName} logo" class="w-5 h-5 rounded-full bg-slate-200 object-contain" onerror="this.style.display='none'">
-            <span class="text-xs font-semibold text-slate-400 truncate">${story.siteName}</span>
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">${story.siteName}</span>
           </div>
         `;
         container.appendChild(tile);
@@ -196,21 +318,19 @@
           return;
       }
 
-      // Dark Mode "All" Button
+      // "All" Button
       const allActiveStyle = currentFilter === 'All' 
-        ? 'bg-blue-600 text-white ring-2 ring-blue-500/50 ring-offset-2 ring-offset-slate-900 border-transparent shadow-md' 
-        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700';
+        ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-transparent dark:text-white ring-2 ring-slate-400 dark:ring-blue-500/50 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 shadow-md' 
+        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700';
         
       let html = `<button onclick="filterCategory('All')" class="whitespace-nowrap px-4 py-1.5 border text-xs font-bold rounded-full transition-all active:scale-95 ${allActiveStyle}">All</button>`;
 
-      // Dynamic Category Buttons
       uniqueCategories.forEach(c => {
         const isActive = currentFilter === c;
         const baseColor = colorMap[c];
         
-        // Use a ring offset that matches the dark background
         const activeStyle = isActive 
-          ? 'ring-2 ring-slate-500 ring-offset-2 ring-offset-slate-900 opacity-100 scale-105 shadow-md border-transparent' 
+          ? 'ring-2 ring-blue-400 dark:ring-slate-500 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 opacity-100 scale-105 shadow-sm dark:shadow-md' 
           : 'opacity-70 hover:opacity-100 hover:scale-105';
 
         html += `<button onclick="filterCategory('${c}')" class="whitespace-nowrap px-4 py-1.5 border text-xs font-bold rounded-full transition-all active:scale-95 ${baseColor} ${activeStyle}">${c}</button>`;
@@ -244,9 +364,8 @@
         if (readArticles.length > 500) readArticles.shift(); 
         localStorage.setItem('feedtile_read', JSON.stringify(readArticles));
         
-        // Apply dark mode read styles immediately
-        element.classList.add('read', 'bg-slate-900/50');
-        element.classList.remove('bg-slate-800', 'shadow-lg');
+        // Strip active classes and add generic 'read' class which handles both light/dark via CSS
+        element.className = 'tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full read';
       }
     }
 
