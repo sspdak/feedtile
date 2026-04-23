@@ -285,8 +285,20 @@
         const badgeColor = colorMap[story.category] || 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
 
         const tile = document.createElement('a');
-        tile.href = story.link;
-        tile.target = "_blank";
+
+        // --- NEW ANDROID INTENT LOGIC START ---
+        if (/Android/i.test(navigator.userAgent)) {
+            // Strip the http:// or https:// from the URL
+            const strippedUrl = story.link.replace(/^https?:\/\//, '');
+            // Wrap it in an Android Intent targeting Firefox
+            tile.href = `intent://${strippedUrl}#Intent;scheme=https;package=org.mozilla.firefox;end`;
+        } else {
+            // Fallback for desktop or iOS
+            tile.href = story.link;
+            tile.target = "_blank";
+        }
+        // --- NEW ANDROID INTENT LOGIC END ---
+
         tile.className = `tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
         tile.onclick = (e) => markAsRead(story.link, tile);
 
