@@ -6,7 +6,7 @@
   <title>FeedTile</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.json">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
     if (localStorage.getItem('feedtile_theme') === 'light' || (!('feedtile_theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -24,6 +24,9 @@
     .dark .read h3 { color: #94a3b8; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Fix for some RSS images overflowing the reader */
+    .prose img { border-radius: 0.75rem; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-300">
@@ -71,6 +74,43 @@
       </div>
   </main>
 
+  <div id="readerModal" class="hidden fixed inset-0 bg-white dark:bg-slate-900 z-[60] flex-col overflow-hidden transition-colors duration-300">
+    <header class="flex justify-between items-center p-3 sm:p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-10">
+      <button onclick="closeReader()" class="flex items-center gap-1 p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+      </button>
+      
+      <div class="flex gap-2">
+        <button id="readerSaveBtn" class="flex items-center gap-2 p-2 px-4 text-sm font-bold text-slate-600 bg-white hover:bg-slate-100 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
+          <span id="readerSaveIcon">☆</span> Save
+        </button>
+        <a id="readerExternalLink" href="#" target="_blank" class="flex items-center p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-full transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-y-auto p-5 sm:p-10 pb-32">
+      <div class="max-w-2xl mx-auto">
+        <div class="flex items-center gap-3 mb-6">
+          <img id="readerLogo" src="" alt="logo" class="w-8 h-8 rounded-full bg-slate-100 object-contain">
+          <div>
+            <div id="readerSiteName" class="text-sm font-bold text-blue-600 dark:text-blue-400"></div>
+            <div id="readerDate" class="text-xs font-medium text-slate-400 dark:text-slate-500"></div>
+          </div>
+        </div>
+        <h1 id="readerTitle" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight mb-8"></h1>
+        
+        <article id="readerContent" class="prose prose-lg prose-slate dark:prose-invert max-w-none text-slate-800 dark:text-slate-300 leading-relaxed"></article>
+        
+        <div id="readerFooter" class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 text-center hidden">
+          <p class="text-slate-500 dark:text-slate-400 mb-4 text-sm">This feed only provides a summary.</p>
+          <a id="readerFooterLink" href="#" target="_blank" class="inline-block px-6 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-500 transition">Read Full Article on Web</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-end sm:items-center">
     <div class="bg-white dark:bg-slate-800 w-full sm:w-[450px] sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col shadow-2xl transition-colors duration-300">
       <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
@@ -102,8 +142,10 @@
   <script>
     const PROXY_URL = 'https://feedtile.ewing-jacob.workers.dev/?url=';
     
+    // STATE
     let feeds = JSON.parse(localStorage.getItem('feedtile_feeds')) || [];
     let readArticles = JSON.parse(localStorage.getItem('feedtile_read')) || [];
+    let savedArticles = JSON.parse(localStorage.getItem('feedtile_saved')) || []; // The new Vault
     let globalStories = []; 
     let currentFilter = 'All'; 
     let currentSourceFilter = 'All'; 
@@ -140,14 +182,9 @@
     if (document.documentElement.classList.contains('dark')) updateThemeUI('dark');
     else updateThemeUI('light');
 
-    function openSettings() {
-      document.getElementById('settingsModal').classList.remove('hidden');
-      renderSettingsFeeds();
-    }
-
-    function closeSettings() {
-      document.getElementById('settingsModal').classList.add('hidden');
-    }
+    function openSettings() { document.getElementById('settingsModal').classList.remove('hidden'); renderSettingsFeeds(); }
+    function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+    function toggleMenu() { document.getElementById('addFeedSection').classList.toggle('hidden'); }
 
     function renderSettingsFeeds() {
       const list = document.getElementById('settingsFeedList');
@@ -155,7 +192,6 @@
         list.innerHTML = `<li class="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">No sources added yet.</li>`;
         return;
       }
-
       list.innerHTML = feeds.map((f, index) => `
         <li class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
           <div class="overflow-hidden">
@@ -174,35 +210,24 @@
         feeds.splice(index, 1);
         localStorage.setItem('feedtile_feeds', JSON.stringify(feeds));
         renderSettingsFeeds();
-        
         const remainingCategories = [...new Set(feeds.map(f => f.category))];
-        if (!remainingCategories.includes(currentFilter)) {
-            currentFilter = 'All';
-            currentSourceFilter = 'All';
+        if (!remainingCategories.includes(currentFilter) && currentFilter !== 'Saved') {
+            currentFilter = 'All'; currentSourceFilter = 'All';
         }
-        
         loadFeeds();
       }
-    }
-
-    function toggleMenu() {
-      const menu = document.getElementById('addFeedSection');
-      menu.classList.toggle('hidden');
     }
 
     function getColorMap() {
       const uniqueCategories = [...new Set(feeds.map(f => f.category))];
       const map = {};
-      uniqueCategories.forEach((cat, index) => {
-        map[cat] = colorPalette[index % colorPalette.length];
-      });
+      uniqueCategories.forEach((cat, index) => { map[cat] = colorPalette[index % colorPalette.length]; });
       return map;
     }
 
     async function loadFeeds() {
       const container = document.getElementById('feedContainer');
       
-      // NEW BRANDED LOADING ANIMATION
       container.innerHTML = `
         <div class="col-span-full py-20 flex flex-col items-center justify-center space-y-6">
           <div class="relative w-20 h-20">
@@ -230,7 +255,7 @@
           const siteTitleNode = xml.querySelector("channel > title, feed > title");
           const siteName = siteTitleNode ? siteTitleNode.textContent : domain.replace('www.', '');
 
-          const items = Array.from(xml.querySelectorAll("item, entry")).slice(0, 12);
+          const items = Array.from(xml.querySelectorAll("item, entry")).slice(0, 15);
           
           items.forEach(item => {
             const title = item.querySelector("title")?.textContent || "No Title";
@@ -238,40 +263,118 @@
             const link = linkNode?.getAttribute("href") || linkNode?.textContent || "#";
             const pubDate = item.querySelector("pubDate, published, updated")?.textContent;
             
+            // NEW EXTRACTION ENGINE: Hunt for full content
+            let content = item.querySelector("encoded")?.textContent || 
+                          item.getElementsByTagNameNS('*', 'encoded')[0]?.textContent || 
+                          item.querySelector("content")?.textContent || 
+                          item.querySelector("description")?.textContent || 
+                          "Content not provided in feed.";
+
+            // Basic check to see if it's a full article or just a snippet (under 300 chars usually means snippet)
+            const isFullArticle = content.length > 300;
+            
             globalStories.push({ 
-              title, link, date: new Date(pubDate), category: feed.category, siteName, domain
+              id: btoa(link).slice(0, 20), // Create a unique ID based on the link
+              title, link, date: new Date(pubDate), category: feed.category, siteName, domain, content, isFullArticle
             });
           });
-        } catch (e) {
-          console.error(`Failed to load ${feed.url}`);
-        }
+        } catch (e) { console.error(`Failed to load ${feed.url}`); }
       }
 
       globalStories.sort((a, b) => b.date - a.date);
+      
+      // If we are currently viewing the "Saved" vault, don't switch back to "All"
       renderCategories();
       renderSources();
       renderTiles();
     }
 
+    // --- READ LATER VAULT LOGIC ---
+    function isSaved(storyId) {
+      return savedArticles.some(article => article.id === storyId);
+    }
+
+    function toggleSave(story, event) {
+      if (event) event.stopPropagation(); // Prevents the tile from opening the reader when you just want to save it
+      
+      if (isSaved(story.id)) {
+        savedArticles = savedArticles.filter(a => a.id !== story.id);
+      } else {
+        savedArticles.push(story);
+      }
+      localStorage.setItem('feedtile_saved', JSON.stringify(savedArticles));
+      
+      // Re-render to update the star icons
+      renderTiles();
+      if (document.getElementById('readerModal').classList.contains('flex')) {
+         updateReaderSaveButton(story);
+      }
+    }
+
+    // --- NATIVE READER LOGIC ---
+    function openReader(story) {
+      document.getElementById('readerTitle').innerText = story.title;
+      document.getElementById('readerSiteName').innerText = story.siteName;
+      document.getElementById('readerDate').innerText = isNaN(new Date(story.date)) ? '' : new Date(story.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      document.getElementById('readerLogo').src = `https://s2.googleusercontent.com/s2/favicons?domain=${story.domain}&sz=64`;
+      
+      document.getElementById('readerContent').innerHTML = story.content;
+      document.getElementById('readerExternalLink').href = story.link;
+      document.getElementById('readerFooterLink').href = story.link;
+
+      if (story.isFullArticle) {
+        document.getElementById('readerFooter').classList.add('hidden');
+      } else {
+        document.getElementById('readerFooter').classList.remove('hidden');
+      }
+
+      updateReaderSaveButton(story);
+
+      // Attach dynamic save function to reader header button
+      document.getElementById('readerSaveBtn').onclick = () => toggleSave(story);
+
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      document.getElementById('readerModal').classList.remove('hidden');
+      document.getElementById('readerModal').classList.add('flex');
+    }
+
+    function closeReader() {
+      document.body.style.overflow = 'auto';
+      document.getElementById('readerModal').classList.add('hidden');
+      document.getElementById('readerModal').classList.remove('flex');
+    }
+
+    function updateReaderSaveButton(story) {
+      const btn = document.getElementById('readerSaveBtn');
+      const icon = document.getElementById('readerSaveIcon');
+      if (isSaved(story.id)) {
+        icon.innerText = '★';
+        icon.classList.add('text-yellow-500');
+        btn.classList.add('ring-2', 'ring-yellow-400', 'ring-offset-1');
+      } else {
+        icon.innerText = '☆';
+        icon.classList.remove('text-yellow-500');
+        btn.classList.remove('ring-2', 'ring-yellow-400', 'ring-offset-1');
+      }
+    }
+
+    // --- FILTER LOGIC ---
     function filterCategory(category) {
       currentFilter = category;
       currentSourceFilter = 'All'; 
-      renderCategories(); 
-      renderSources();
-      renderTiles();      
+      renderCategories(); renderSources(); renderTiles();      
     }
-
-    function filterSource(sourceName) {
-      currentSourceFilter = sourceName;
-      renderTiles();
-    }
+    function filterSource(sourceName) { currentSourceFilter = sourceName; renderTiles(); }
 
     function renderTiles() {
       const container = document.getElementById('feedContainer');
       container.innerHTML = '';
 
-      let filteredStories = globalStories;
-      if (currentFilter !== 'All') {
+      // Determine which pool of stories to show
+      let baseStories = currentFilter === 'Saved' ? savedArticles : globalStories;
+      let filteredStories = baseStories;
+
+      if (currentFilter !== 'All' && currentFilter !== 'Saved') {
         filteredStories = filteredStories.filter(story => story.category === currentFilter);
       }
       if (currentSourceFilter !== 'All') {
@@ -279,62 +382,55 @@
       }
 
       if (filteredStories.length === 0) {
+        let emptyMessage = currentFilter === 'Saved' ? "You haven't saved any stories for later." : "Add some feeds or adjust your filters!";
         container.innerHTML = `
           <div class="col-span-full mt-10 p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700">
             <h3 class="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No Stories Here</h3>
-            <p class="text-slate-500 text-sm">Add some feeds or adjust your filters!</p>
+            <p class="text-slate-500 text-sm">${emptyMessage}</p>
           </div>`;
         return;
       }
 
       const colorMap = getColorMap();
-      const isAndroid = /Android/i.test(navigator.userAgent);
 
       filteredStories.forEach(story => {
         const isRead = readArticles.includes(story.link) ? 'read' : 'bg-white shadow-sm dark:bg-slate-800 dark:shadow-lg border-slate-200 dark:border-slate-700';
-        const dateStr = isNaN(story.date) ? '' : story.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const dateStr = isNaN(new Date(story.date)) ? '' : new Date(story.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const logoUrl = `https://s2.googleusercontent.com/s2/favicons?domain=${story.domain}&sz=64`;
-        
         const badgeColor = colorMap[story.category] || 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
+        
+        const savedIcon = isSaved(story.id) ? '★' : '☆';
+        const savedColor = isSaved(story.id) ? 'text-yellow-500' : 'text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400';
 
-        const tile = document.createElement('a');
+        const tile = document.createElement('div');
+        tile.className = `tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full ${isRead} relative group`;
         
-        // Setup initial attributes
-        tile.href = story.link;
-        if (!isAndroid) tile.target = "_blank"; // Only set target blank if NOT Android
-        
-        tile.className = `tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
-        
-        // INTENT HIJACK LOGIC
-        tile.onclick = (e) => {
+        // Native Reader Hijack
+        tile.onclick = () => {
           markAsRead(story.link, tile);
-          
-          if (isAndroid) {
-            e.preventDefault(); // Stop Chrome from routing the link
-            
-            // Strip scheme and force the OS to handle the intent directly
-            const strippedUrl = story.link.replace(/^https?:\/\//, '');
-            const intentUrl = `intent://${strippedUrl}#Intent;scheme=https;package=org.mozilla.firefox;action=android.intent.action.VIEW;end;`;
-            
-            // Break out of the PWA sandbox to the OS intent handler
-            window.location.href = intentUrl; 
-          }
+          openReader(story);
         };
 
         tile.innerHTML = `
           <div class="flex justify-between items-start mb-3">
             <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border ${badgeColor}">${story.category}</span>
-            <span class="text-xs text-slate-400 dark:text-slate-500 font-medium">${dateStr}</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 font-medium pr-6">${dateStr}</span>
           </div>
           
-          <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug flex-1 mb-4">${story.title}</h3>
+          <button id="saveBtn-${story.id}" class="absolute top-4 right-4 text-xl ${savedColor} transition-transform active:scale-125 focus:outline-none z-10">${savedIcon}</button>
+          
+          <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 leading-snug flex-1 mb-4 pr-4">${story.title}</h3>
           
           <div class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-slate-700/50">
             <img src="${logoUrl}" alt="${story.siteName} logo" class="w-5 h-5 rounded-full bg-slate-200 object-contain" onerror="this.style.display='none'">
-            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">${story.siteName}</span>
+            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate flex-1">${story.siteName}</span>
+            ${!story.isFullArticle ? '<span class="text-[9px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500">Summary</span>' : ''}
           </div>
         `;
         container.appendChild(tile);
+
+        // Attach event listener to the save button
+        document.getElementById(`saveBtn-${story.id}`).onclick = (e) => toggleSave(story, e);
       });
     }
 
@@ -343,21 +439,22 @@
       const uniqueCategories = [...new Set(feeds.map(f => f.category))];
       const colorMap = getColorMap();
       
-      if(uniqueCategories.length === 0) {
-          container.innerHTML = '';
-          return;
-      }
-
       const allActiveStyle = currentFilter === 'All' 
         ? 'bg-slate-800 text-white border-slate-800 dark:bg-blue-600 dark:border-transparent dark:text-white ring-2 ring-slate-400 dark:ring-blue-500/50 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 shadow-md' 
         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700';
         
+      const savedActiveStyle = currentFilter === 'Saved' 
+        ? 'bg-yellow-50 text-yellow-700 border-yellow-300 ring-2 ring-yellow-400 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700 dark:ring-yellow-600 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 shadow-md scale-105' 
+        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700';
+
       let html = `<button onclick="filterCategory('All')" class="whitespace-nowrap px-4 py-1.5 border text-xs font-bold rounded-full transition-all active:scale-95 ${allActiveStyle}">All</button>`;
+      
+      // Inject the permanent "Saved" Category Button
+      html += `<button onclick="filterCategory('Saved')" class="whitespace-nowrap px-4 py-1.5 border text-xs font-bold rounded-full transition-all active:scale-95 flex items-center gap-1 ${savedActiveStyle}"><span class="text-yellow-500 text-sm leading-none">★</span> Read Later</button>`;
 
       uniqueCategories.forEach(c => {
         const isActive = currentFilter === c;
         const baseColor = colorMap[c];
-        
         const activeStyle = isActive 
           ? 'ring-2 ring-blue-400 dark:ring-slate-500 ring-offset-1 dark:ring-offset-2 dark:ring-offset-slate-900 opacity-100 scale-105 shadow-sm dark:shadow-md' 
           : 'opacity-70 hover:opacity-100 hover:scale-105';
@@ -371,9 +468,10 @@
     function renderSources() {
       const dropdown = document.getElementById('sourceFilterDropdown');
       
-      let relevantStories = globalStories;
-      if (currentFilter !== 'All') {
-        relevantStories = globalStories.filter(s => s.category === currentFilter);
+      let baseStories = currentFilter === 'Saved' ? savedArticles : globalStories;
+      let relevantStories = baseStories;
+      if (currentFilter !== 'All' && currentFilter !== 'Saved') {
+        relevantStories = baseStories.filter(s => s.category === currentFilter);
       }
       
       const uniqueSources = [...new Set(relevantStories.map(s => s.siteName))].sort();
@@ -389,7 +487,6 @@
       dropdown.parentElement.classList.remove('hidden');
 
       let html = `<option value="All">All Sources (${uniqueSources.length})</option>`;
-      
       uniqueSources.forEach(source => {
         const isSelected = currentSourceFilter === source ? 'selected' : '';
         html += `<option value="${source}" ${isSelected}>${source}</option>`;
@@ -403,18 +500,13 @@
       const category = document.getElementById('feedCategory').value.trim() || 'General';
       if (!url) return;
 
-      if (feeds.some(f => f.url === url)) {
-          alert("You are already following this source!");
-          return;
-      }
+      if (feeds.some(f => f.url === url)) { alert("You are already following this source!"); return; }
 
       feeds.push({ url, category });
       localStorage.setItem('feedtile_feeds', JSON.stringify(feeds));
       
-      document.getElementById('feedUrl').value = '';
-      document.getElementById('feedCategory').value = '';
-      toggleMenu();
-      loadFeeds();
+      document.getElementById('feedUrl').value = ''; document.getElementById('feedCategory').value = '';
+      toggleMenu(); loadFeeds();
     }
 
     function markAsRead(link, element) {
@@ -422,14 +514,12 @@
         readArticles.push(link);
         if (readArticles.length > 500) readArticles.shift(); 
         localStorage.setItem('feedtile_read', JSON.stringify(readArticles));
-        
-        element.className = 'tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full read';
+        element.classList.add('read');
+        element.classList.remove('bg-white', 'shadow-sm', 'dark:bg-slate-800', 'dark:shadow-lg');
       }
     }
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
-    }
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 
     loadFeeds();
   </script>
