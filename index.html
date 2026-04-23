@@ -162,10 +162,21 @@
     ];
 
     // ==========================================
+    // BUG FIX: Proper Unique ID Generator
+    // ==========================================
+    function generateId(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+      }
+      return 'id_' + Math.abs(hash).toString(36);
+    }
+
+    // ==========================================
     // BACK BUTTON INTERCEPT (History API Fix)
     // ==========================================
     window.addEventListener('popstate', (event) => {
-      // If the back button is pressed, hide any open modals
       const reader = document.getElementById('readerModal');
       const settings = document.getElementById('settingsModal');
       
@@ -201,11 +212,11 @@
     if (document.documentElement.classList.contains('dark')) updateThemeUI('dark'); else updateThemeUI('light');
 
     function openSettings() { 
-      history.pushState({ modal: 'settings' }, '', '#settings'); // Create fake history state
+      history.pushState({ modal: 'settings' }, '', '#settings'); 
       document.getElementById('settingsModal').classList.remove('hidden'); 
       renderSettingsFeeds(); 
     }
-    function closeSettings() { history.back(); } // Trigger native popstate
+    function closeSettings() { history.back(); } 
     function toggleMenu() { document.getElementById('addFeedSection').classList.toggle('hidden'); }
 
     function renderSettingsFeeds() {
@@ -286,12 +297,11 @@
                           item.querySelector("description")?.textContent || 
                           "Content not provided in feed.";
 
-            // Strip basic HTML tags from summary string to check actual text length
             const plainTextContent = content.replace(/<[^>]*>?/gm, '');
-            const isFullArticle = plainTextContent.length > 500; // If it's short, it's just a summary
+            const isFullArticle = plainTextContent.length > 500; 
             
             globalStories.push({ 
-              id: btoa(link).slice(0, 20),
+              id: generateId(link), // NOW USING THE FIX
               title, link, date: new Date(pubDate), category: feed.category, siteName, domain, content, isFullArticle
             });
           });
@@ -317,9 +327,9 @@
     // LEVEL 2: Readability Extraction Engine
     // ==========================================
     async function openReader(story) {
-      history.pushState({ modal: 'reader' }, '', '#article'); // Create fake history state for Android back swipe
+      history.pushState({ modal: 'reader' }, '', '#article'); 
       
-      document.getElementById('readerScrollArea').scrollTop = 0; // Reset scroll position
+      document.getElementById('readerScrollArea').scrollTop = 0; 
       document.getElementById('readerTitle').innerText = story.title;
       document.getElementById('readerSiteName').innerText = story.siteName;
       document.getElementById('readerDate').innerText = isNaN(new Date(story.date)) ? '' : new Date(story.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -339,34 +349,28 @@
       document.getElementById('readerModal').classList.remove('hidden');
       document.getElementById('readerModal').classList.add('flex');
 
-      // If we already have the full article from the RSS feed, display it instantly.
       if (story.isFullArticle) {
         contentDiv.innerHTML = story.content;
         pill.classList.add('hidden');
         pill.classList.remove('flex');
         footer.classList.add('hidden');
       } 
-      // If it's just a summary, try to use Readability to fetch the rest
       else {
-        contentDiv.innerHTML = story.content; // Show summary while loading
+        contentDiv.innerHTML = story.content; 
         pill.classList.remove('hidden');
         pill.classList.add('flex');
         footer.classList.add('hidden');
 
         try {
-          // Ask our worker for the raw HTML of the article
           const res = await fetch(PROXY_URL + encodeURIComponent(story.link) + '&mode=html');
           const rawHtml = await res.text();
-          
-          // Parse it using Mozilla Readability
           const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
           const reader = new Readability(doc);
           const article = reader.parse();
 
-          // If extraction was successful and it actually looks like an article
           if (article && article.textContent.length > 500) {
             contentDiv.innerHTML = article.content;
-            contentDiv.classList.add('fade-in'); // Add smooth fade
+            contentDiv.classList.add('fade-in'); 
             setTimeout(() => contentDiv.classList.remove('fade-in'), 500);
             pill.classList.add('hidden');
             pill.classList.remove('flex');
@@ -377,12 +381,12 @@
           console.warn("Extraction failed, falling back to summary.");
           pill.classList.add('hidden');
           pill.classList.remove('flex');
-          footer.classList.remove('hidden'); // Show the "Read on Web" button
+          footer.classList.remove('hidden'); 
         }
       }
     }
 
-    function closeReader() { history.back(); } // Trigger native popstate
+    function closeReader() { history.back(); } 
 
     function updateReaderSaveButton(story) {
       const btn = document.getElementById('readerSaveBtn');
