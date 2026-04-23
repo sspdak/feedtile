@@ -60,12 +60,11 @@
   </header>
 
   <main class="flex-1 p-4 md:p-6 lg:p-8 h-full overflow-y-auto w-full max-w-7xl mx-auto">
-    <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-2 px-1 scrollbar-hide" id="categoryBadges">
-      </div>
+    <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-2 px-1 scrollbar-hide" id="categoryBadges"></div>
 
     <div class="mb-6 px-1 flex items-center justify-between">
-      <select id="sourceFilterDropdown" onchange="filterSource(this.value)" class="w-full sm:w-64 p-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 dark:text-slate-300 cursor-pointer appearance-none">
-        </select>
+      <select id="sourceFilterDropdown" onchange="filterSource(this.value)" class="w-full sm:w-64 p-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 dark:text-slate-300 cursor-pointer appearance-none hidden">
+      </select>
     </div>
 
     <div id="feedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -202,7 +201,20 @@
 
     async function loadFeeds() {
       const container = document.getElementById('feedContainer');
-      container.innerHTML = `<div class="col-span-full py-12 flex justify-center"><div class="animate-pulse flex space-x-4"><div class="flex-1 space-y-4 py-1"><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded w-3/4"></div><div class="space-y-2"><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded"></div><div class="h-4 bg-slate-300 dark:bg-slate-700 rounded w-5/6"></div></div></div></div></div>`;
+      
+      // NEW BRANDED LOADING ANIMATION
+      container.innerHTML = `
+        <div class="col-span-full py-20 flex flex-col items-center justify-center space-y-6">
+          <div class="relative w-20 h-20">
+            <div class="absolute inset-0 bg-blue-500 rounded-2xl animate-ping opacity-20"></div>
+            <img src="icon.svg" class="relative w-full h-full rounded-2xl shadow-lg animate-pulse" alt="Loading...">
+          </div>
+          <div class="flex flex-col items-center space-y-2">
+            <p class="text-lg font-bold text-slate-700 dark:text-slate-300">Fetching Stories...</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Checking your sources</p>
+          </div>
+        </div>
+      `;
       
       globalStories = []; 
 
@@ -243,7 +255,7 @@
 
     function filterCategory(category) {
       currentFilter = category;
-      currentSourceFilter = 'All'; // Reset dropdown when main category changes
+      currentSourceFilter = 'All'; 
       renderCategories(); 
       renderSources();
       renderTiles();      
@@ -276,6 +288,7 @@
       }
 
       const colorMap = getColorMap();
+      const isAndroid = /Android/i.test(navigator.userAgent);
 
       filteredStories.forEach(story => {
         const isRead = readArticles.includes(story.link) ? 'read' : 'bg-white shadow-sm dark:bg-slate-800 dark:shadow-lg border-slate-200 dark:border-slate-700';
@@ -285,22 +298,28 @@
         const badgeColor = colorMap[story.category] || 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
 
         const tile = document.createElement('a');
-
-        // --- NEW ANDROID INTENT LOGIC START ---
-        if (/Android/i.test(navigator.userAgent)) {
-            // Strip the http:// or https:// from the URL
-            const strippedUrl = story.link.replace(/^https?:\/\//, '');
-            // Wrap it in an Android Intent targeting Firefox
-            tile.href = `intent://${strippedUrl}#Intent;scheme=https;package=org.mozilla.firefox;end`;
-        } else {
-            // Fallback for desktop or iOS
-            tile.href = story.link;
-            tile.target = "_blank";
-        }
-        // --- NEW ANDROID INTENT LOGIC END ---
-
+        
+        // Setup initial attributes
+        tile.href = story.link;
+        if (!isAndroid) tile.target = "_blank"; // Only set target blank if NOT Android
+        
         tile.className = `tile block p-5 border rounded-2xl cursor-pointer flex flex-col h-full ${isRead}`;
-        tile.onclick = (e) => markAsRead(story.link, tile);
+        
+        // INTENT HIJACK LOGIC
+        tile.onclick = (e) => {
+          markAsRead(story.link, tile);
+          
+          if (isAndroid) {
+            e.preventDefault(); // Stop Chrome from routing the link
+            
+            // Strip scheme and force the OS to handle the intent directly
+            const strippedUrl = story.link.replace(/^https?:\/\//, '');
+            const intentUrl = `intent://${strippedUrl}#Intent;scheme=https;package=org.mozilla.firefox;action=android.intent.action.VIEW;end;`;
+            
+            // Break out of the PWA sandbox to the OS intent handler
+            window.location.href = intentUrl; 
+          }
+        };
 
         tile.innerHTML = `
           <div class="flex justify-between items-start mb-3">
@@ -357,13 +376,12 @@
         relevantStories = globalStories.filter(s => s.category === currentFilter);
       }
       
-      // Sort sources alphabetically for easier scanning
       const uniqueSources = [...new Set(relevantStories.map(s => s.siteName))].sort();
 
       if(uniqueSources.length === 0) {
           dropdown.innerHTML = `<option value="All">No sources available</option>`;
           dropdown.disabled = true;
-          dropdown.parentElement.classList.add('hidden'); // Hide the row if empty
+          dropdown.parentElement.classList.add('hidden');
           return;
       }
 
