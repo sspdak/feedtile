@@ -26,8 +26,6 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .prose img { border-radius: 0.75rem; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
-    
-    /* Fade animation for newly loaded content */
     .fade-in { animation: fadeIn 0.5s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
@@ -63,8 +61,8 @@
   <main class="flex-1 p-4 md:p-6 lg:p-8 h-full overflow-y-auto w-full max-w-7xl mx-auto">
     <div class="mb-2 flex gap-3 overflow-x-auto pt-3 pb-2 px-1 scrollbar-hide" id="categoryBadges"></div>
 
-    <div class="mb-6 px-1 flex items-center justify-between">
-      <select id="sourceFilterDropdown" onchange="filterSource(this.value)" class="w-full sm:w-64 p-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 dark:text-slate-300 cursor-pointer appearance-none hidden"></select>
+    <div id="sourceFilterWrapper" class="mb-6 px-1 flex items-center justify-between hidden">
+      <select id="sourceFilterDropdown" onchange="filterSource(this.value)" class="w-full sm:w-64 p-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-700 dark:text-slate-300 cursor-pointer appearance-none"></select>
     </div>
 
     <div id="feedContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6"></div>
@@ -75,7 +73,6 @@
       <button onclick="closeReader()" class="flex items-center gap-1 p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
       </button>
-      
       <div class="flex gap-2">
         <button id="readerSaveBtn" class="flex items-center gap-2 p-2 px-4 text-sm font-bold text-slate-600 bg-white hover:bg-slate-100 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
           <span id="readerSaveIcon">☆</span> Save
@@ -161,21 +158,15 @@
       'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-800/50'
     ];
 
-    // ==========================================
-    // BUG FIX: Proper Unique ID Generator
-    // ==========================================
     function generateId(str) {
       let hash = 0;
       for (let i = 0; i < str.length; i++) {
         hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash |= 0; // Convert to 32bit integer
+        hash |= 0; 
       }
       return 'id_' + Math.abs(hash).toString(36);
     }
 
-    // ==========================================
-    // BACK BUTTON INTERCEPT (History API Fix)
-    // ==========================================
     window.addEventListener('popstate', (event) => {
       const reader = document.getElementById('readerModal');
       const settings = document.getElementById('settingsModal');
@@ -301,7 +292,7 @@
             const isFullArticle = plainTextContent.length > 500; 
             
             globalStories.push({ 
-              id: generateId(link), // NOW USING THE FIX
+              id: generateId(link),
               title, link, date: new Date(pubDate), category: feed.category, siteName, domain, content, isFullArticle
             });
           });
@@ -323,9 +314,6 @@
       if (document.getElementById('readerModal').classList.contains('flex')) { updateReaderSaveButton(story); }
     }
 
-    // ==========================================
-    // LEVEL 2: Readability Extraction Engine
-    // ==========================================
     async function openReader(story) {
       history.pushState({ modal: 'reader' }, '', '#article'); 
       
@@ -485,6 +473,8 @@
 
     function renderSources() {
       const dropdown = document.getElementById('sourceFilterDropdown');
+      const wrapper = document.getElementById('sourceFilterWrapper'); // Target the wrapper
+      
       let baseStories = currentFilter === 'Saved' ? savedArticles : globalStories;
       let relevantStories = baseStories;
       if (currentFilter !== 'All' && currentFilter !== 'Saved') { relevantStories = baseStories.filter(s => s.category === currentFilter); }
@@ -493,10 +483,14 @@
 
       if(uniqueSources.length === 0) {
           dropdown.innerHTML = `<option value="All">No sources available</option>`;
-          dropdown.disabled = true; dropdown.parentElement.classList.add('hidden'); return;
+          dropdown.disabled = true; 
+          wrapper.classList.add('hidden'); // Hide the wrapper
+          return;
       }
 
-      dropdown.disabled = false; dropdown.parentElement.classList.remove('hidden');
+      dropdown.disabled = false; 
+      wrapper.classList.remove('hidden'); // Show the wrapper
+
       let html = `<option value="All">All Sources (${uniqueSources.length})</option>`;
       uniqueSources.forEach(source => {
         const isSelected = currentSourceFilter === source ? 'selected' : '';
