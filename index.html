@@ -26,6 +26,8 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .prose img { border-radius: 0.75rem; max-width: 100%; height: auto; margin-left: auto; margin-right: auto; }
+    
+    /* Fade animation for newly loaded content */
     .fade-in { animation: fadeIn 0.5s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
   </style>
@@ -35,7 +37,7 @@
   <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm dark:shadow-md transition-colors duration-300">
     <div class="p-4 flex justify-between items-center">
       <h1 class="text-2xl font-bold flex items-center gap-2 text-blue-600 dark:text-blue-400 cursor-pointer" onclick="filterCategory('All')">
-        <img src="icon.svg" class="w-8 h-8 rounded shadow-sm" alt="Logo"> FeedTile
+        <img src="icon.svg?v=2" class="w-8 h-8 rounded shadow-sm" alt="Logo"> FeedTile
       </h1>
       
       <div class="flex gap-2">
@@ -73,6 +75,7 @@
       <button onclick="closeReader()" class="flex items-center gap-1 p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
       </button>
+      
       <div class="flex gap-2">
         <button id="readerSaveBtn" class="flex items-center gap-2 p-2 px-4 text-sm font-bold text-slate-600 bg-white hover:bg-slate-100 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition">
           <span id="readerSaveIcon">☆</span> Save
@@ -144,6 +147,7 @@
     let readArticles = JSON.parse(localStorage.getItem('feedtile_read')) || [];
     let savedArticles = JSON.parse(localStorage.getItem('feedtile_saved')) || []; 
     let globalStories = []; 
+    let feedErrors = {}; // Tracks the network state of each feed
     let currentFilter = 'All'; 
     let currentSourceFilter = 'All'; 
 
@@ -216,17 +220,22 @@
         list.innerHTML = `<li class="text-sm text-slate-500 dark:text-slate-400 italic text-center py-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">No sources added yet.</li>`;
         return;
       }
-      list.innerHTML = feeds.map((f, index) => `
+      list.innerHTML = feeds.map((f, index) => {
+        const isError = feedErrors[f.url];
+        const errorBadge = isError ? `<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800">OFFLINE</span>` : '';
+        const textStyle = isError ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200';
+
+        return `
         <li class="flex justify-between items-center p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-          <div class="overflow-hidden">
-            <div class="text-[10px] font-bold text-blue-500 uppercase">${f.category}</div>
-            <div class="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">${f.url.replace(/^https?:\/\//, '')}</div>
+          <div class="overflow-hidden flex-1 pr-4">
+            <div class="flex items-center text-[10px] font-bold text-blue-500 uppercase">${f.category} ${errorBadge}</div>
+            <div class="text-sm font-semibold ${textStyle} truncate">${f.url.replace(/^https?:\/\//, '')}</div>
           </div>
-          <button onclick="removeFeed(${index})" class="ml-4 p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 rounded-lg transition">
+          <button onclick="removeFeed(${index})" class="p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 rounded-lg transition shrink-0">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
           </button>
         </li>
-      `).join('');
+      `}).join('');
     }
 
     function removeFeed(index) {
@@ -255,7 +264,7 @@
         <div class="col-span-full py-20 flex flex-col items-center justify-center space-y-6">
           <div class="relative w-20 h-20">
             <div class="absolute inset-0 bg-blue-500 rounded-2xl animate-ping opacity-20"></div>
-            <img src="icon.svg" class="relative w-full h-full rounded-2xl shadow-lg animate-pulse" alt="Loading...">
+            <img src="icon.svg?v=2" class="relative w-full h-full rounded-2xl shadow-lg animate-pulse" alt="Loading...">
           </div>
           <div class="flex flex-col items-center space-y-2">
             <p class="text-lg font-bold text-slate-700 dark:text-slate-300">Fetching Stories...</p>
@@ -264,6 +273,7 @@
         </div>
       `;
       globalStories = []; 
+      feedErrors = {}; // Reset tracking on new load
 
       for (const feed of feeds) {
         try {
@@ -272,31 +282,40 @@
           const res = await fetch(PROXY_URL + encodeURIComponent(feed.url));
           const text = await res.text();
           const xml = new window.DOMParser().parseFromString(text, "text/xml");
+          
           const siteTitleNode = xml.querySelector("channel > title, feed > title");
           const siteName = siteTitleNode ? siteTitleNode.textContent : domain.replace('www.', '');
           const items = Array.from(xml.querySelectorAll("item, entry")).slice(0, 15);
           
-          items.forEach(item => {
-            const title = item.querySelector("title")?.textContent || "No Title";
-            const linkNode = item.querySelector("link");
-            const link = linkNode?.getAttribute("href") || linkNode?.textContent || "#";
-            const pubDate = item.querySelector("pubDate, published, updated")?.textContent;
-            
-            let content = item.querySelector("encoded")?.textContent || 
-                          item.getElementsByTagNameNS('*', 'encoded')[0]?.textContent || 
-                          item.querySelector("content")?.textContent || 
-                          item.querySelector("description")?.textContent || 
-                          "Content not provided in feed.";
+          if (items.length === 0) {
+            feedErrors[feed.url] = true;
+          } else {
+            feedErrors[feed.url] = false;
+            items.forEach(item => {
+              const title = item.querySelector("title")?.textContent || "No Title";
+              const linkNode = item.querySelector("link");
+              const link = linkNode?.getAttribute("href") || linkNode?.textContent || "#";
+              const pubDate = item.querySelector("pubDate, published, updated")?.textContent;
+              
+              let content = item.querySelector("encoded")?.textContent || 
+                            item.getElementsByTagNameNS('*', 'encoded')[0]?.textContent || 
+                            item.querySelector("content")?.textContent || 
+                            item.querySelector("description")?.textContent || 
+                            "Content not provided in feed.";
 
-            const plainTextContent = content.replace(/<[^>]*>?/gm, '');
-            const isFullArticle = plainTextContent.length > 500; 
-            
-            globalStories.push({ 
-              id: generateId(link),
-              title, link, date: new Date(pubDate), category: feed.category, siteName, domain, content, isFullArticle
+              const plainTextContent = content.replace(/<[^>]*>?/gm, '');
+              const isFullArticle = plainTextContent.length > 500; 
+              
+              globalStories.push({ 
+                id: generateId(link),
+                title, link, date: new Date(pubDate), category: feed.category, siteName, domain, content, isFullArticle
+              });
             });
-          });
-        } catch (e) { console.error(`Failed to load ${feed.url}`); }
+          }
+        } catch (e) { 
+          console.error(`Failed to load ${feed.url}`); 
+          feedErrors[feed.url] = true;
+        }
       }
       globalStories.sort((a, b) => b.date - a.date);
       renderCategories(); renderSources(); renderTiles();
@@ -473,7 +492,7 @@
 
     function renderSources() {
       const dropdown = document.getElementById('sourceFilterDropdown');
-      const wrapper = document.getElementById('sourceFilterWrapper'); // Target the wrapper
+      const wrapper = document.getElementById('sourceFilterWrapper'); 
       
       let baseStories = currentFilter === 'Saved' ? savedArticles : globalStories;
       let relevantStories = baseStories;
@@ -484,12 +503,12 @@
       if(uniqueSources.length === 0) {
           dropdown.innerHTML = `<option value="All">No sources available</option>`;
           dropdown.disabled = true; 
-          wrapper.classList.add('hidden'); // Hide the wrapper
+          wrapper.classList.add('hidden'); 
           return;
       }
 
       dropdown.disabled = false; 
-      wrapper.classList.remove('hidden'); // Show the wrapper
+      wrapper.classList.remove('hidden'); 
 
       let html = `<option value="All">All Sources (${uniqueSources.length})</option>`;
       uniqueSources.forEach(source => {
