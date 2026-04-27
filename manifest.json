@@ -8,7 +8,7 @@
   "description": "A custom tile-based RSS Reader.",
   "icons": [
     {
-      "src": "icon.svg",
+      "src": "icon.svg?v=2",
       "sizes": "any",
       "type": "image/svg+xml"
     }
